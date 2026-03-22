@@ -200,6 +200,24 @@ input[type="range"]{flex:1;cursor:pointer;accent-color:var(--navy);height:6px;}
 .pm-title{font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--navy);position:relative;padding-bottom:3px;}
 .pm-title::after{content:'';position:absolute;bottom:0;left:0;width:100%;height:2px;background:linear-gradient(90deg,var(--orange),transparent);border-radius:2px;}
 /* Dropdown month picker */
+
+/* MONTH-YEAR CALENDAR PICKER */
+.mypicker-wrap{position:relative;display:inline-block;}
+.mypicker-btn{background:var(--bg);border:1.5px solid var(--border);color:var(--navy);font-family:inherit;font-size:12px;font-weight:600;padding:6px 28px 6px 12px;border-radius:20px;cursor:pointer;outline:none;min-width:130px;text-align:left;position:relative;transition:border-color .2s;}
+.mypicker-btn::after{content:'';position:absolute;right:10px;top:50%;transform:translateY(-50%);border:4px solid transparent;border-top-color:var(--navy);margin-top:2px;}
+.mypicker-btn:focus,.mypicker-btn.open{border-color:var(--navy);box-shadow:0 0 0 3px rgba(26,58,108,.1);}
+.mypicker-panel{position:absolute;top:calc(100% + 6px);left:0;background:#fff;border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.15);z-index:900;min-width:240px;padding:10px;}
+.mypicker-panel.hidden{display:none;}
+.mypicker-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding-bottom:7px;border-bottom:1px solid var(--border-lt);}
+.mypicker-year{font-size:13px;font-weight:700;color:var(--navy);}
+.mypicker-nav{background:none;border:none;cursor:pointer;color:var(--navy);font-size:16px;padding:2px 8px;border-radius:5px;transition:background .15s;}
+.mypicker-nav:hover{background:var(--navy-pale);}
+.mypicker-months{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;}
+.mypicker-month{background:none;border:none;font-family:inherit;font-size:11.5px;font-weight:600;color:var(--text-mid);padding:7px 4px;border-radius:6px;cursor:pointer;transition:all .15s;text-align:center;}
+.mypicker-month:hover{background:var(--navy-pale);color:var(--navy);}
+.mypicker-month.selected{background:var(--navy);color:#fff;}
+.mypicker-month.disabled{opacity:.3;cursor:not-allowed;}
+
 .pm-month-sel{background:var(--bg);border:1px solid var(--border);color:var(--navy);font-family:inherit;font-size:12px;font-weight:600;padding:5px 28px 5px 12px;border-radius:20px;cursor:pointer;outline:none;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%231a3a6c' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 9px center;transition:border-color .2s;min-width:120px;}
 .pm-month-sel:focus{border-color:var(--navy);box-shadow:0 0 0 3px rgba(26,58,108,.1);}
 /* Metrics row */
@@ -796,12 +814,34 @@ body.app-ready #hamburger{display:none;}/* base hidden - media query shows it */
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
           <div style="display:flex;align-items:center;gap:5px;">
             <label style="font-size:11px;color:var(--text-dim)">From</label>
-            <select id="mmFrom" class="pm-month-sel" style="min-width:130px"></select>
+            <div class="mypicker-wrap" id="mmFromWrap">
+              <button class="mypicker-btn" id="mmFromBtn" type="button">Select month</button>
+              <div class="mypicker-panel hidden" id="mmFromPanel">
+                <div class="mypicker-header">
+                  <button class="mypicker-nav" id="mmFromPrev" type="button">&#8249;</button>
+                  <span class="mypicker-year" id="mmFromYear"></span>
+                  <button class="mypicker-nav" id="mmFromNext" type="button">&#8250;</button>
+                </div>
+                <div class="mypicker-months" id="mmFromMonths"></div>
+              </div>
+            </div>
+            <input type="hidden" id="mmFrom"/>
           </div>
           <span style="color:var(--text-dim)">&#8594;</span>
           <div style="display:flex;align-items:center;gap:5px;">
             <label style="font-size:11px;color:var(--text-dim)">To</label>
-            <select id="mmTo" class="pm-month-sel" style="min-width:130px"></select>
+            <div class="mypicker-wrap" id="mmToWrap">
+              <button class="mypicker-btn" id="mmToBtn" type="button">Select month</button>
+              <div class="mypicker-panel hidden" id="mmToPanel">
+                <div class="mypicker-header">
+                  <button class="mypicker-nav" id="mmToPrev" type="button">&#8249;</button>
+                  <span class="mypicker-year" id="mmToYear"></span>
+                  <button class="mypicker-nav" id="mmToNext" type="button">&#8250;</button>
+                </div>
+                <div class="mypicker-months" id="mmToMonths"></div>
+              </div>
+            </div>
+            <input type="hidden" id="mmTo"/>
           </div>
           <button id="mmApplyBtn" class="btn-pm" style="font-size:12px;padding:5px 16px;border-radius:20px;">Apply</button>
         </div>
@@ -2142,15 +2182,83 @@ window.onload = function() {
     };
   }
 
-  function populateMmDropdowns(){
+  /* MONTH PICKER STATE */
+  var mpFromYear=2025,mpToYear=2026;
+
+  function fmtMonthKey(y,m){return y+'-'+(m<9?'0'+(m+1):''+(m+1));}
+  function fmtMonthLbl(key){var p=key.split('-');return MONTHS[parseInt(p[1])-1]+' '+p[0];}
+
+  function renderMonthGrid(panelId,monthsId,yearId,currentKey,yearVar,setter){
+    var panel=document.getElementById(panelId);
+    var monthsEl=document.getElementById(monthsId);
+    var yearEl=document.getElementById(yearId);
     var allKeys=getAllMonthKeys();
-    var fromSel=document.getElementById('mmFrom');
-    var toSel=document.getElementById('mmTo');
-    fromSel.innerHTML='';toSel.innerHTML='';
-    allKeys.forEach(function(key){
-      var p=key.split('-');var lbl=MONTHS[parseInt(p[1])-1]+' '+p[0];
-      fromSel.innerHTML+='<option value="'+key+'"'+(key===mmFromKey?' selected':'')+'>'+lbl+'</option>';
-      toSel.innerHTML+='<option value="'+key+'"'+(key===mmToKey?' selected':'')+'>'+lbl+'</option>';
+    yearEl.textContent=yearVar;
+    monthsEl.innerHTML=MONTHS.map(function(m,i){
+      var key=fmtMonthKey(yearVar,i);
+      var exists=allKeys.indexOf(key)>=0;
+      var sel=key===currentKey;
+      var cls='mypicker-month'+(sel?' selected':'')+(exists?'':' disabled');
+      return '<button class="'+cls+'" data-key="'+key+'" data-setter="'+setter+'" type="button"'+(exists?'':' disabled')+'>'+m.substring(0,3)+'</button>';
+    }).join('');
+    /* wire month clicks via event delegation */
+    monthsEl.onclick=function(e){
+      var btn=e.target.closest('button.mypicker-month');
+      if(!btn||btn.disabled)return;
+      var key=btn.getAttribute('data-key');
+      var fn=btn.getAttribute('data-setter');
+      if(fn==='setMmFrom')window.setMmFrom(key);
+      else if(fn==='setMmTo')window.setMmTo(key);
+    };
+  }
+
+
+  window.setMmFrom=function(key){
+    mmFromKey=key;
+    document.getElementById('mmFrom').value=key;
+    document.getElementById('mmFromBtn').textContent=fmtMonthLbl(key);
+    document.getElementById('mmFromPanel').classList.add('hidden');
+    document.getElementById('mmFromBtn').classList.remove('open');
+  };
+  window.setMmTo=function(key){
+    mmToKey=key;
+    document.getElementById('mmTo').value=key;
+    document.getElementById('mmToBtn').textContent=fmtMonthLbl(key);
+    document.getElementById('mmToPanel').classList.add('hidden');
+    document.getElementById('mmToBtn').classList.remove('open');
+  };
+
+  function populateMmDropdowns(){
+    if(mmFromKey){document.getElementById('mmFromBtn').textContent=fmtMonthLbl(mmFromKey);document.getElementById('mmFrom').value=mmFromKey;}
+    if(mmToKey){document.getElementById('mmToBtn').textContent=fmtMonthLbl(mmToKey);document.getElementById('mmTo').value=mmToKey;}
+    var fk=mmFromKey||fmtMonthKey(2025,2);var p=fk.split('-');mpFromYear=parseInt(p[0]);
+    var tk=mmToKey||fmtMonthKey(2026,1);var p2=tk.split('-');mpToYear=parseInt(p2[0]);
+    renderMonthGrid('mmFromPanel','mmFromMonths','mmFromYear',mmFromKey,mpFromYear,'setMmFrom');
+    renderMonthGrid('mmToPanel','mmToMonths','mmToYear',mmToKey,mpToYear,'setMmTo');
+    /* wire nav buttons */
+    document.getElementById('mmFromPrev').onclick=function(){mpFromYear--;renderMonthGrid('mmFromPanel','mmFromMonths','mmFromYear',mmFromKey,mpFromYear,'setMmFrom');};
+    document.getElementById('mmFromNext').onclick=function(){mpFromYear++;renderMonthGrid('mmFromPanel','mmFromMonths','mmFromYear',mmFromKey,mpFromYear,'setMmFrom');};
+    document.getElementById('mmToPrev').onclick=function(){mpToYear--;renderMonthGrid('mmToPanel','mmToMonths','mmToYear',mmToKey,mpToYear,'setMmTo');};
+    document.getElementById('mmToNext').onclick=function(){mpToYear++;renderMonthGrid('mmToPanel','mmToMonths','mmToYear',mmToKey,mpToYear,'setMmTo');};
+    /* toggle panels */
+    document.getElementById('mmFromBtn').onclick=function(){
+      var p=document.getElementById('mmFromPanel');var open=!p.classList.contains('hidden');
+      document.querySelectorAll('.mypicker-panel').forEach(function(x){x.classList.add('hidden');});
+      document.querySelectorAll('.mypicker-btn').forEach(function(x){x.classList.remove('open');});
+      if(!open){p.classList.remove('hidden');this.classList.add('open');}
+    };
+    document.getElementById('mmToBtn').onclick=function(){
+      var p=document.getElementById('mmToPanel');var open=!p.classList.contains('hidden');
+      document.querySelectorAll('.mypicker-panel').forEach(function(x){x.classList.add('hidden');});
+      document.querySelectorAll('.mypicker-btn').forEach(function(x){x.classList.remove('open');});
+      if(!open){p.classList.remove('hidden');this.classList.add('open');}
+    };
+    /* close on outside click */
+    document.addEventListener('click',function(e){
+      if(!e.target.closest('.mypicker-wrap')){
+        document.querySelectorAll('.mypicker-panel').forEach(function(x){x.classList.add('hidden');});
+        document.querySelectorAll('.mypicker-btn').forEach(function(x){x.classList.remove('open');});
+      }
     });
   }
 
@@ -2160,8 +2268,8 @@ window.onload = function() {
     populateMmDropdowns();
     /* wire apply button */
     document.getElementById('mmApplyBtn').onclick=function(){
-      var f=document.getElementById('mmFrom').value;
-      var t=document.getElementById('mmTo').value;
+      var f=mmFromKey||document.getElementById('mmFrom').value;
+      var t=mmToKey||document.getElementById('mmTo').value;
       if(f>t){var tmp=f;f=t;t=tmp;}
       mmFromKey=f;mmToKey=t;
       /* highlight no preset */
@@ -2567,8 +2675,7 @@ window.onload = function() {
     var p=val.split('|'),tmp=document.createElement('textarea');tmp.innerHTML=p[0];cUser={dept:tmp.value,role:p[1]};
     document.getElementById('loginScreen').style.display='none';
     document.getElementById('app').style.display='block';
-    document.getElementById('hamburger').style.display='none'; /* mobile only - CSS shows it */
-    document.body.classList.add('app-ready');
+    document.body.classList.add('app-ready'); /* CSS media query will show hamburger on mobile */
     buildApp();
     /* Run due-soon scan after app is built */
     setTimeout(function(){runDueSoonScan();renderNotifBell();},300);
